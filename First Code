@@ -1,0 +1,70 @@
+// onetick.js - HyperLogLog with 64-bit hashing, Linear Counting, and bias correction
+
+const crypto = require('crypto'); // Import Node's crypto module for hashing
+
+class HLL {
+  constructor(p = 8) { // Constructor takes precision p (default = 8)
+    if (p < 4 || p > 16) throw new Error('p must be between 4 and 16'); // Ensure p is valid
+    this.p = p;                    // Save precision
+    this.m = 1 << p;               // Number of registers m = 2^p
+    this.M = new Uint8Array(this.m); // Create array of m registers, all 0 initially
+
+    // Alpha constant used in raw HLL formula (depends on m)
+    if (this.m === 16) this.alpha = 0.673;
+    else if (this.m === 32) this.alpha = 0.697;
+    else if (this.m === 64) this.alpha = 0.709;
+    else this.alpha = 0.7213 / (1 + 1.079 / this.m);
+  }
+
+  hash64(x) { // Hash function: maps input to 64-bit number
+    const b = crypto.createHash('sha256').update(String(x)).digest(); // SHA-256 digest
+    let v = 0n;                         // Start empty BigInt
+    for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(b[i]); // Take first 8 bytes = 64-bit hash
+    return v;                           // Return 64-bit BigInt hash
+  }
+
+  rho(w, maxBits) { // rho = count leading zeros + 1
+    if (w === 0n) return maxBits + 1;   // If all bits zero, rho = maxBits+1
+    let val = w << BigInt(64 - maxBits); // Left align value in 64 bits
+    let r = 1;                          // Start count at 1
+    for (let i = 0; i < maxBits; i++) { // Loop through bits
+      if ((val & (1n << 63n)) !== 0n) break; // Stop if MSB is 1
+      r++;                              // Otherwise increment rho
+      val <<= 1n;                       // Shift left to check next bit
+    }
+    return r;                           // Return rho
+  }
+
+  add(value) {                          // Add one element to HLL
+    const x = this.hash64(value);       // Get 64-bit hash
+    const shift = 64n - BigInt(this.p); // How many bits left after index
+    const idx = Number(x >> shift);     // Top p bits = register index
+    const mask = (1n << shift) - 1n;    // Mask for lower bits
+    const w = x & mask;                 // Extract lower bits
+    const r = this.rho(w, 64 - this.p); // Count leading zeros in lower bits
+    if (r > this.M[idx]) this.M[idx] = r; // Update register with max rho
+  }
+
+  linearCounting(m, V) {                // Linear counting for small range
+    if (V === 0) return m * Math.log(m / 1); // Avoid log(0)
+    return m * Math.log(m / V);         // Formula m * ln(m/V)
+  }
+
+  estimate() {                          // Estimate cardinality
+    let sum = 0.0;
+    for (let i = 0; i < this.m; i++) sum += Math.pow(2, -this.M[i]); // Harmonic sum
+    const raw = this.alpha * (this.m * this.m) / sum; // Raw HLL estimate
+
+    let V = 0;                          // Count zero registers
+    for (let i = 0; i < this.m; i++) if (this.M[i] === 0) V++;
+
+    if (raw <= (5.0 / 2.0) * this.m && V > 0) { // Small-range correction
+      return this.linearCounting(this.m, V);   // Use LinearCounting if needed
+    }
+
+    const biasFactor = 1.04 / Math.sqrt(this.m); // Theoretical std error
+    return raw / (1 + biasFactor * 0.5);       // Bias correction: adjust estimate
+  }
+}
+
+module.exports = { HLL };               // Export HLL class
