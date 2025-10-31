@@ -1,0 +1,53 @@
+// threetick.js - Run HLL for different register sizes and print table
+
+const fs = require('fs');                // Import filesystem
+const readline = require('readline');    // Import readline for streaming
+const { HLL } = require('./onetick');    // Import our HLL class
+
+async function estimateFromCSV(csvPath, p) { // Estimate with HLL of precision p
+  const hll = new HLL(p);                 // Create HLL instance
+  const rl = readline.createInterface({   // Stream CSV line by line
+    input: fs.createReadStream(csvPath, { encoding: 'utf-8' }),
+    crlfDelay: Infinity
+  });
+  let first = true;                       // Flag to skip header
+  for await (const line of rl) {          // Loop over lines
+    if (first) { first = false; continue; } // Skip header
+    const parts = line.split(',');        // Split by comma
+    if (parts.length < 2) continue;       // Skip malformed lines
+    hll.add(parts[1]);                    // Add druit_name to HLL
+  }
+  return Math.round(hll.estimate());      // Return rounded estimate
+}
+
+function theoreticalStdError(m) {         // Theoretical error formula
+  return 1.04 / Math.sqrt(m);             // 1.04 / sqrt(m)
+}
+
+(async () => {                            // Main program as async function
+  const csv = process.argv[2];            // Take CSV path from command line
+  if (!csv) {                             // If not given
+    console.error('Usage: node threetick.js <csvfile>'); // Print usage
+    process.exit(1);                      // Exit program
+  }
+
+  const ACTUAL = 500000;                  // Ground truth unique count
+
+  const ps = [7,8,9,10,11,12,13,14];      // Test different precisions (m = 2^p)
+
+  console.log('=======================================================================');
+  console.log('|   Registers   |   Estimate   | Signed Err% | Abs Err% | Theo StdErr% |');
+  console.log('-----------------------------------------------------------------------');
+
+  for (const p of ps) {                   // Loop over all p values
+    const m = 1 << p;                     // m = 2^p
+    const est = await estimateFromCSV(csv, p); // Estimate from CSV
+    const signedErr = ((est - ACTUAL) / ACTUAL) * 100; // Signed error %
+    const absErr = Math.abs(signedErr);   // Absolute error %
+    const theo = theoreticalStdError(m) * 100; // Theoretical error %
+    console.log(`| ${m.toString().padStart(11)} | ${est.toString().padStart(11)} | ${signedErr.toFixed(2).padStart(10)}% | ${absErr.toFixed(2).padStart(7)}% | ${theo.toFixed(2).padStart(11)}% |`);
+  }
+
+  console.log('=======================================================================');
+})();
+
