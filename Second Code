@@ -1,0 +1,28 @@
+// twotick.js - Generate dataset CSV
+
+const fs = require('fs'); // Import filesystem module
+
+function generateCSV(path = 'druits_1M.csv', totalRows = 10000000, unique = 5000000) {
+  const s = fs.createWriteStream(path, { flags: 'w' }); // Open file stream
+  s.write('id,druit_name\n');          // Write CSV header
+  let id = 1;                          // Row id counter
+
+  for (let i = 0; i < unique; i++) {   // First write all unique elements
+    s.write(`${id},druit_${i}\n`);     // Write unique druit name
+    id++;
+  }
+
+  let remaining = totalRows - unique;  // Number of extra rows needed
+  for (let i = 0; i < remaining; i++) { // Repeat some values
+    const j = i % unique;              // Cycle through unique set
+    s.write(`${id},druit_${j}\n`);     // Write duplicate value
+    id++;
+  }
+
+  s.end();                             // Close file stream
+  s.on('finish', () =>                 // When writing finished
+    console.log(`CSV generated: ${path} (${totalRows} rows, ${unique} unique)`)
+  );
+}
+
+generateCSV(); // Run generator with defaults (10M rows, 5M Unique Elements )
