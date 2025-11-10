@@ -1,4 +1,4 @@
-// onetick.js - HyperLogLog with 64-bit hashing, Linear Counting, and bias correction
+//onetick.js - HyperLogLog with 64-bit hashing, Linear Counting, and bias correction
 
 const crypto = require('crypto'); // Import Node's crypto module for hashing
 
