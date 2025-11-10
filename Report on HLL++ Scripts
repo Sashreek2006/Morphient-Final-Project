@@ -1,0 +1,103 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\geometry{margin=1in}
+\setstretch{1.25}
+
+\titleformat{\section}{\bfseries\Large}{\thesection.}{1em}{}
+\titleformat{\subsection}{\bfseries\normalsize}{\thesubsection.}{0.8em}{}
+
+\title{\textbf{Report on HyperLogLog Cardinality Estimator and Accuracy Evaluation}}
+\author{\textbf{Sashreek Reddy} \\ Intern at Morphient}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This report presents an overview and technical explanation of two implementations related to the \textbf{HyperLogLog (HLL)} algorithm a probabilistic data structure that estimates the number of distinct elements in large datasets using minimal memory.  
+
+The two components discussed are:
+\begin{enumerate}
+    \item \textbf{HyperLogLog Cardinality Estimator (64-bit, Bias-Corrected)} — the core algorithm that implements the fundamental logic of HLL for cardinality estimation.
+    \item \textbf{HyperLogLog Accuracy Evaluator and Precision Benchmark Tool} — a benchmarking utility that measures estimation accuracy across multiple precision settings.
+\end{enumerate}
+
+Together, these scripts form a complete analytical framework for high-efficiency estimation and validation, incorporating improvements inspired by the \textbf{HyperLogLog++} model.
+
+\section{HyperLogLog Cardinality Estimator (64-bit, Bias-Corrected)}
+The first component implements a bias-corrected HyperLogLog algorithm using 64-bit hashing. It is designed to estimate unique elements in massive datasets without explicitly storing them, achieving near-constant memory usage regardless of input size.
+
+\subsection{Core Working Mechanism}
+Each incoming data element is processed as follows:
+\begin{enumerate}
+    \item The element is hashed using the SHA-256 algorithm and truncated to a 64-bit value.
+    \item The upper $p$ bits of the hash determine which register to update (\(m = 2^p\)).
+    \item The remaining bits are used to compute the \textbf{rho} value — the position of the first set bit (number of leading zeros + 1).
+    \item Each register stores the maximum observed \textbf{rho} value for its range.
+    \item After all insertions, the final estimate is computed using the HLL formula:
+    \[
+    E = \alpha_m \cdot m^2 \cdot \left( \sum_{i=1}^{m} 2^{-M[i]} \right)^{-1}
+    \]
+    where \(\alpha_m\) is a bias correction constant.
+\end{enumerate}
+
+\subsection{Improvements and Bias Correction}
+This implementation integrates key refinements inspired by \textbf{HyperLogLog++}:
+\begin{itemize}
+    \item \textbf{64-bit Hashing:} Improves uniform distribution and minimizes collisions.
+    \item \textbf{Linear Counting:} For small datasets where many registers remain zero, a logarithmic correction method provides more accurate results.
+    \item \textbf{Bias Correction:} A correction factor of \(1.04 / \sqrt{m}\) compensates for overestimation or underestimation in large cardinalities.
+\end{itemize}
+
+These enhancements significantly increase accuracy across varying dataset scales while maintaining computational efficiency and low memory consumption.
+
+\section{HyperLogLog Accuracy Evaluator and Precision Benchmark Tool}
+This module evaluates the estimator’s accuracy and stability by testing it on a dataset across multiple precision levels. It serves as a \textbf{benchmarking tool} for understanding the trade-off between precision (accuracy) and resource consumption (memory).
+
+\subsection{Functionality Overview}
+The tool operates by reading a dataset line by line using Node.js streaming, ensuring high performance even for very large files. For each precision value (\(p = 7\) to \(14\)):
+\begin{itemize}
+    \item A new HLL instance is created.
+    \item Each data entry is added to the estimator.
+    \item The estimated count is compared to the actual known number of unique elements.
+\end{itemize}
+
+The script then generates a table summarizing:
+\begin{itemize}
+    \item Estimated vs. Actual Count,
+    \item Signed and Absolute Error Percentages,
+    \item Theoretical Standard Error (\(1.04 / \sqrt{m}\)).
+\end{itemize}
+
+\subsection{Insights from Benchmarking}
+The benchmarking results highlight how increasing the precision parameter \(p\) leads to lower estimation error but higher memory usage. This trade-off allows engineers to choose an optimal precision based on application requirements — whether accuracy or efficiency is the priority.
+
+\section{Understanding HyperLogLog and HyperLogLog++}
+\textbf{HyperLogLog (HLL)} is a cardinality estimation algorithm known for its ability to handle massive datasets using only a few kilobytes of memory. It is widely used in distributed systems such as databases, analytics platforms, and web-scale monitoring tools.
+
+However, classical HLL suffers from bias at small scales. The improved version, \textbf{HyperLogLog++}, introduces:
+\begin{itemize}
+    \item \textbf{Linear Counting} for better accuracy when the number of unique elements is low.
+    \item \textbf{Empirical Bias Correction} to fine-tune estimates at medium cardinalities.
+    \item \textbf{Higher-bit Hashing (64/128-bit)} to achieve more uniform randomness.
+\end{itemize}
+
+The implementations discussed in this report integrate these advanced techniques, bridging the gap between theoretical accuracy and real-world scalability.
+
+\section{Conclusion}
+The \textbf{HyperLogLog Cardinality Estimator (64-bit, Bias-Corrected)} provides a compact and robust way to approximate unique element counts in large datasets. Its companion module, the \textbf{Accuracy Evaluator and Precision Benchmark Tool}, offers valuable analytical insights into performance across varying precision levels.
+
+Together, these implementations demonstrate the effectiveness of probabilistic data structures in large-scale computation, where memory and processing efficiency are as critical as accuracy.
+
+\bigskip
+\noindent\textbf{Report by:} Sashreek Reddy \\
+\textit{Intern at Morphient}
+
+\end{document}
