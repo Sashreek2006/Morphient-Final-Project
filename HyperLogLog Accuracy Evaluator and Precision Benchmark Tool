@@ -47,6 +47,5 @@ function theoreticalStdError(m) {         // Theoretical error formula
     console.log(`| ${m.toString().padStart(11)} | ${est.toString().padStart(11)} | ${signedErr.toFixed(2).padStart(10)}% | ${absErr.toFixed(2).padStart(7)}% | ${theo.toFixed(2).padStart(11)}% |`);
   }
 
-  console.log('=======================================================================');
 })();
 
